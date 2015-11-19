@@ -222,7 +222,7 @@ def unzipFile(filePath, workspace, smallKey,logs):
     zipTemp.close()
     del zipTemp
 
-def validateMetaDataService(smallKey, workspace, metaDataUrl, logs):
+def validateMetaDataService(smallKey, workspace, metaDataUrl, logs, geocatUrl, geocatUsername, geocatPassword):
     """Validate meta data setvice in the Data Catalogue
 
     Args:
@@ -230,6 +230,9 @@ def validateMetaDataService(smallKey, workspace, metaDataUrl, logs):
         workspace: Folder in which data is unzipped to.
         metaDataUrl:Malformed metadata url
         logs: log list holds all log items for current publication
+        geocatUrl: The URL to the Data Catalogue
+        geocatUsername: The username to login to the Data Catalogue
+        geocatPassword: The password to login to the Data Catalogue		
     returns:  True if valid, False otherwise
     """
     isValid =True
@@ -242,21 +245,23 @@ def validateMetaDataService(smallKey, workspace, metaDataUrl, logs):
     jsonData.close()
     uuid = jsonObj['config']['UUID']
 
-    metaDataUrl = metaDataUrl+ uuid
-
+    #metaDataUrl = metaDataUrl+ uuid
+    metaDataUrl = metaDataUrl.replace("{0}", uuid)
+    base64string = base64.b64encode('%s:%s' % (geocatUsername, geocatPassword)).replace('\n', '')
+    #headers = {'Content-Type': 'application/soap+xml+x-www-form-urlencoded; charset=utf-8','Authorization': 'Basic %s' % base64string}	
     request = urllib2.Request(metaDataUrl)
-
+    request.add_header("Authorization", "Basic %s" % base64string)	
+    printLog(logs,"Checking metadata: " + metaDataUrl)		
     try:
         response = urllib2.urlopen(request)
-
     except urllib2.URLError as e:
         if hasattr(e, 'reason'):
-            printLog(logs,'access metaData, We failed to reach a server.')
+            printLog(logs,'Cannot access Catalogue metadata: We failed to reach a server.')
             printLog(logs,'Reason: %s' % e.reason)
 
         elif hasattr(e, 'code'):
             responses = BaseHTTPRequestHandler.responses
-            printLog(logs,'access metaData: The server couldn\'t fulfill the request.')
+            printLog(logs,'Cannot access Catalogue metadata: The server couldn\'t fulfill the request.')
             printLog(logs,'Error code: %s - %s: %s' % (e.code, responses[e.code][0], responses[e.code][1]))
             isValid=False
     return isValid
@@ -359,7 +364,7 @@ def errorValidation(smallKey,smallKeyFolder,publishStatus,geocatUrl, geocatUsern
             return 1
 
 
-    if validateMetaDataService(smallKey, smallKeyFolder, metaDataUrl, logs) ==False:
+    if validateMetaDataService(smallKey, smallKeyFolder, metaDataUrl, logs, geocatUrl, geocatUsername, geocatPassword) ==False:
         return 1
 
     return result
